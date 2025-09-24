@@ -1,0 +1,1 @@
+- [ ] add script that updates this repo based on a target chuckd commit, based on its go.mod

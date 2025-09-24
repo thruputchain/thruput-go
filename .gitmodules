@@ -1,0 +1,6 @@
+[submodule "chuckd"]
+	path = chuckd
+	url = git@github.com:groundhogchain/chuckd.git
+[submodule "protocol-go"]
+	path = protocol-go
+	url = git@github.com:groundhogchain/protocol-go.git
