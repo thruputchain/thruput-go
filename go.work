@@ -2,5 +2,6 @@ go 1.24.4
 
 use (
 	./chuckd
-	./protocol-go
 )
+
+replace github.com/groundhogchain/protocol-go => ./protocol-go
