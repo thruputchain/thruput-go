@@ -8,4 +8,5 @@ EOF
 
 # Now launch system
 export X23SERVER_TRACE_hogexec=,/tmp/$(whoami)/hogexec.log
+export GOXDR_LOG_CALLS=1
 scripts/launch-multi.sh
