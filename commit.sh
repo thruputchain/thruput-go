@@ -18,4 +18,4 @@ chuckd_commit=$(submodule_commit "chuckd")
 protocol_go_commit=$(submodule_commit "protocol-go")
 
 COMMIT_MSG="protocol=${protocol_commit} chuckd=${chuckd_commit} protocol-go=${protocol_go_commit}"
-git commit -m "bump to protocol@${COMMIT_MSG}"
+git commit -m "bump to ${COMMIT_MSG}"
