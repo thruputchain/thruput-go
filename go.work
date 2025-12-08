@@ -5,3 +5,5 @@ use (
 )
 
 replace github.com/groundhogchain/protocol-go => ./protocol-go
+
+replace github.com/groundhogchain/lib-go => ./lib-go

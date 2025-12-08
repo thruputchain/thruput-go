@@ -4,3 +4,6 @@
 [submodule "protocol-go"]
 	path = protocol-go
 	url = git@github.com:groundhogchain/protocol-go.git
+[submodule "lib-go"]
+	path = lib-go
+	url = git@github.com:groundhogchain/lib-go.git

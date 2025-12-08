@@ -15,7 +15,8 @@ submodule_commit() {
 
 protocol_commit=$(submodule_commit "protocol-go/protocol")
 chuckd_commit=$(submodule_commit "chuckd")
+lib_go_commit=$(submodule_commit "lib-go")
 protocol_go_commit=$(submodule_commit "protocol-go")
 
-COMMIT_MSG="protocol=${protocol_commit} chuckd=${chuckd_commit} protocol-go=${protocol_go_commit}"
+COMMIT_MSG="protocol=${protocol_commit} chuckd=${chuckd_commit} protocol-go=${protocol_go_commit} lib-go=${lib_go_commit}"
 git commit -m "${COMMIT_MSG}"
