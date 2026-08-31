@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # The submodules are private and pinned by ssh:// URL in .gitmodules.
+      # Rather than carry four read deploy keys, mint one short-lived
+      # installation token from the Protocol Synchronizer app and rewrite
+      # those URLs to HTTPS. The token is scoped to exactly these four
+      # repositories and is revoked when the job ends.
+      - name: Generate submodule read token
+        id: submodule-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.PROTOCOL_SYNCHRONIZER_APP_ID }}
+          private-key: ${{ secrets.PROTOCOL_SYNCHRONIZER_SECRET_KEY }}
+          owner: groundhogchain
+          repositories: protocol-go,chuckd,lib-go
+
+      # Deliberately not `submodules: recursive` on checkout, and three
+      # repositories rather than four. chuckd carries its own hogx/ and scp/
+      # submodules and protocol-go carries protocol, but none of the three is
+      # a Go module dependency -- the workspace builds with all of them empty,
+      # because protocol-go's generated bindings are committed rather than
+      # regenerated here. Recursing would only widen the token's repository
+      # list to check out code nothing compiles.
+      #
+      # The rewrites are per-repository rather than a blanket
+      # git@github.com: -> https:// rule, so nothing else in the job silently
+      # changes transport.
+      - name: Check out submodules
+        env:
+          GH_TOKEN: ${{ steps.submodule-token.outputs.token }}
+        run: |
+          for repo in protocol-go chuckd lib-go; do
+            git config --global \
+              url."https://x-access-token:${GH_TOKEN}@github.com/groundhogchain/${repo}".insteadOf \
+              "git@github.com:groundhogchain/${repo}"
+          done
+          git submodule update --init chuckd lib-go protocol-go
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.work
+          cache-dependency-path: |
+            go.work.sum
+            chuckd/go.sum
+
+      # go.work has `use (./chuckd)` with replace directives pointing at the
+      # protocol-go and lib-go submodules, so this compiles chuckd against the
+      # pinned bindings. That is the whole point of the gate: a protocol-go
+      # bump that changes an API breaks here rather than on main.
+      - name: Build
+        run: go build ./chuckd/...
+
+      # `go build` skips _test.go, so an API change that breaks only chuckd's
+      # tests would pass the step above. vet typechecks test files without
+      # running them, which closes that gap for about a second.
+      #
+      # Running chuckd's suite is deliberately not this repo's job. It takes
+      # over four minutes on a warm cache and belongs to chuckd's own CI; the
+      # question here is only whether a bumped protocol-go still compiles.
+      #
+      # -composites=false because goxdr emits unkeyed struct literals, the
+      # same flag protocol and protocol-go pass.
+      - name: Vet
+        run: go vet -composites=false ./chuckd/...
