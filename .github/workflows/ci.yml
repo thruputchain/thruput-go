@@ -14,9 +14,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # persist-credentials: false because nothing here pushes, and leaving
+      # the checkout token in .git/config as an http.extraheader puts a second
+      # credential in play alongside the app token embedded in the submodule
+      # URLs below. It resolves in the app token's favour today -- submodule
+      # checkout succeeds -- but that is precedence between two Authorization
+      # sources, not something worth depending on.
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
+      # Pinned to a commit SHA rather than the v3 tag: this step receives the
+      # App private key, so a retargeted tag would run different code with
+      # that credential. protocol-ts pins the same SHA.
+      #
       # The submodules are private and pinned by ssh:// URL in .gitmodules.
       # Rather than carry four read deploy keys, mint one short-lived
       # installation token from the Protocol Synchronizer app and rewrite
@@ -24,7 +36,7 @@ jobs:
       # repositories and is revoked when the job ends.
       - name: Generate submodule read token
         id: submodule-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.PROTOCOL_SYNCHRONIZER_APP_ID }}
           private-key: ${{ secrets.PROTOCOL_SYNCHRONIZER_SECRET_KEY }}
@@ -54,7 +66,7 @@ jobs:
           git submodule update --init chuckd lib-go protocol-go
 
       - name: Install Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.work
           cache-dependency-path: |
