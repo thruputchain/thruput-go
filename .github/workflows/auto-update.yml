@@ -1,0 +1,125 @@
+name: Auto-update protocol-go
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-update-protocol-go
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      # Agent plus checkout ssh-key, the same arrangement protocol-go,
+      # protocol-ts and protocol-rs use for their auto-update jobs.
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@e83874834305fe9a4a2997156cb26c5de65a8555 # v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.GROUNDHOG_GO_TO_SELF_WRITE_KEY }}
+
+      # Unlike ci.yml this keeps persist-credentials at its default, because
+      # this job pushes: checkout writes the deploy key to a temp file and
+      # points core.sshCommand at it, and persist-credentials: false would
+      # delete both at the end of this step, leaving the push below with no
+      # key.
+      #
+      # The push has to use that key rather than GITHUB_TOKEN -- commits
+      # pushed with GITHUB_TOKEN do not start workflow runs, so ci.yml would
+      # never report on the branch and auto-merge would have nothing to wait
+      # for.
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ssh-key: ${{ secrets.GROUNDHOG_GO_TO_SELF_WRITE_KEY }}
+
+      # Pinned to a commit SHA rather than the v3 tag: this step receives the
+      # App private key, so a retargeted tag would run different code with
+      # that credential. Same SHA protocol-ts pins.
+      #
+      # Only two repositories, not the three ci.yml asks for: this job never
+      # builds, so it needs protocol-go (to move the pointer) and protocol
+      # (because commit.sh reports the nested pin) but not chuckd or lib-go.
+      - name: Generate submodule read token
+        id: submodule-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.PROTOCOL_SYNCHRONIZER_APP_ID }}
+          private-key: ${{ secrets.PROTOCOL_SYNCHRONIZER_SECRET_KEY }}
+          owner: groundhogchain
+          repositories: protocol-go,protocol
+
+      # The rewrites are per-repository on purpose. A blanket
+      # git@github.com: -> https:// rule would also capture this repository's
+      # own origin and send the push below over the app token instead of the
+      # deploy key.
+      #
+      # chuckd and lib-go are left uninitialized: commit.sh reads their
+      # hashes straight out of the index, which works without a checkout.
+      # protocol-go/protocol does NOT -- it only appears in
+      # `git submodule status --recursive` once protocol-go itself is
+      # initialized, and without it the commit message comes out silently
+      # malformed as "protocol= chuckd=...".
+      - name: Move protocol-go to its main
+        env:
+          GH_TOKEN: ${{ steps.submodule-token.outputs.token }}
+        run: |
+          for repo in protocol-go protocol; do
+            git config --global \
+              url."https://x-access-token:${GH_TOKEN}@github.com/groundhogchain/${repo}".insteadOf \
+              "git@github.com:groundhogchain/${repo}"
+          done
+          git submodule update --init protocol-go
+          git -C protocol-go fetch origin main
+          git -C protocol-go checkout origin/main
+          git -C protocol-go submodule update --init protocol
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "protocol-go pointer already up to date."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and open PR
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          PROTOCOL_GO_SHA=$(git -C protocol-go rev-parse --short HEAD)
+          BRANCH="auto-update/protocol-go"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+          git add protocol-go
+          # commit.sh writes the full
+          # "protocol=… chuckd=… protocol-go=… lib-go=…" line, the same
+          # message the manual bump-groundhog-go path produces.
+          ./commit.sh
+          git push -f -u origin "$BRANCH"
+
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url')
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Updated existing PR: $EXISTING_PR"
+          else
+            gh pr create \
+              --title "Auto-update protocol-go to ${PROTOCOL_GO_SHA}" \
+              --body "Automated protocol-go submodule pointer bump.
+
+          protocol-go: groundhogchain/protocol-go@${PROTOCOL_GO_SHA}
+
+          Auto-merges once the build check confirms chuckd still compiles
+          against the bumped bindings. If it goes red, chuckd most likely
+          needs a companion bump -- see #19 for the shape of that fix." || true
+          fi
+
+          gh pr merge "$BRANCH" --auto --squash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
