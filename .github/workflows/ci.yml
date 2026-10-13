@@ -32,10 +32,10 @@ jobs:
       # App private key, so a retargeted tag would run different code with
       # that credential. protocol-ts pins the same SHA.
       #
-      # The submodules are private and pinned by ssh:// URL in .gitmodules.
-      # Rather than carry four read deploy keys, mint one short-lived
+      # The submodules are private and pinned by SSH URL in .gitmodules.
+      # Rather than carry separate read deploy keys, mint one short-lived
       # installation token from the Protocol Synchronizer app and rewrite
-      # those URLs to HTTPS. The token is scoped to exactly these four
+      # those URLs to HTTPS. The token is scoped to exactly these three
       # repositories and is revoked when the job ends.
       - name: Generate submodule read token
         id: submodule-token
@@ -43,8 +43,9 @@ jobs:
         with:
           app-id: ${{ vars.PROTOCOL_SYNCHRONIZER_APP_ID }}
           private-key: ${{ secrets.PROTOCOL_SYNCHRONIZER_SECRET_KEY }}
-          owner: groundhogchain
-          repositories: protocol-go,chuckd,lib-go
+          owner: thruputchain
+          repositories: thruput-protocol-go,chuckd,lib-go
+          permission-contents: read
 
       # Deliberately not `submodules: recursive` on checkout, and three
       # repositories rather than four. chuckd carries its own hogx/ and scp/
@@ -61,10 +62,10 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.submodule-token.outputs.token }}
         run: |
-          for repo in protocol-go chuckd lib-go; do
+          for repo in thruput-protocol-go chuckd lib-go; do
             git config --global \
-              url."https://x-access-token:${GH_TOKEN}@github.com/groundhogchain/${repo}".insteadOf \
-              "git@github.com:groundhogchain/${repo}"
+              url."https://x-access-token:${GH_TOKEN}@github.com/thruputchain/${repo}.git".insteadOf \
+              "git@github.com:thruputchain/${repo}.git"
           done
           git submodule update --init chuckd lib-go protocol-go
 
