@@ -8,7 +8,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: auto-update-protocol-go
+  group: qualify-private-thruput-go
   cancel-in-progress: true
 
 jobs:
@@ -36,6 +36,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ssh-key: ${{ secrets.GROUNDHOG_GO_TO_SELF_WRITE_KEY }}
+          fetch-depth: 2 # Include the reviewed parent for workflow restoration.
 
       # Pinned to a commit SHA rather than the v3 tag: this step receives the
       # App private key, so a retargeted tag would run different code with
@@ -79,8 +80,8 @@ jobs:
             url."https://x-access-token:${GH_TOKEN}@github.com/thruputchain/thruput-protocol-go.git".insteadOf \
             "git@github.com:thruputchain/thruput-protocol-go.git"
           git submodule update --init protocol-go
-          git -C protocol-go fetch origin main
-          git -C protocol-go checkout origin/main
+          git -C protocol-go fetch origin 8ebc218fec5e8a61f0c1ed743a7bc59fa0ee7e61
+          git -C protocol-go checkout 8ebc218fec5e8a61f0c1ed743a7bc59fa0ee7e61
 
       - name: Check for changes
         id: diff
@@ -96,13 +97,14 @@ jobs:
         if: steps.diff.outputs.changed == 'true'
         run: |
           PROTOCOL_GO_SHA=$(git -C protocol-go rev-parse --short HEAD)
-          BRANCH="auto-update/protocol-go"
+          BRANCH="qualification/private-protocol-go"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git checkout -b "$BRANCH"
-          git add protocol-go
+          git show 7d6a840a5a9a25bb048ad60be79070361d8d5d5d:.github/workflows/auto-update.yml > .github/workflows/auto-update.yml
+          git add protocol-go .github/workflows/auto-update.yml
           # commit.sh writes the full
           # "protocol=… chuckd=… protocol-go=… lib-go=…" line, the same
           # message the manual bump-groundhog-go path produces.
@@ -114,16 +116,15 @@ jobs:
             echo "Updated existing PR: $EXISTING_PR"
           else
             gh pr create \
-              --title "Auto-update protocol-go to ${PROTOCOL_GO_SHA}" \
-              --body "Automated protocol-go submodule pointer bump.
+              --draft --base repair-private-protocol-routing \
+              --title "Qualify private Go workspace updater at ${PROTOCOL_GO_SHA}" \
+              --body "Isolated private protocol-go read, retained write-key push and draft PR qualification. Production workflow is restored in the generated branch. Do not merge.
 
           protocol-go: thruputchain/thruput-protocol-go@${PROTOCOL_GO_SHA}
 
-          Auto-merges once the build check confirms chuckd still compiles
-          against the bumped bindings. If it goes red, chuckd most likely
-          needs a companion bump -- see #19 for the shape of that fix." || true
+          This qualification never enables automatic merge."
           fi
 
-          gh pr merge "$BRANCH" --auto --squash
+          # Qualification stays draft; no automatic merge.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
