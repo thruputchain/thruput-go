@@ -1,9 +1,7 @@
 go 1.26.0
 
-use (
-	./chuckd
-)
+use ./chuckd
 
-replace github.com/groundhogchain/protocol-go => ./protocol-go
+replace github.com/thruputchain/thruput-protocol-go => ./protocol-go
 
-replace github.com/groundhogchain/lib-go => ./lib-go
+replace github.com/thruputchain/lib-go => ./lib-go
