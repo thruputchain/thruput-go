@@ -48,9 +48,9 @@ jobs:
           permission-contents: read
 
       # Deliberately not `submodules: recursive` on checkout, and three
-      # repositories rather than four. chuckd carries its own hogx/ and scp/
-      # submodules and protocol-go carries protocol, but none of the three is
-      # a Go module dependency -- the workspace builds with all of them empty,
+      # repositories rather than four. chuckd carries its own scp/ submodule
+      # and protocol-go carries protocol, but neither is a Go module
+      # dependency -- the workspace builds with both empty,
       # because protocol-go's generated bindings are committed rather than
       # regenerated here. Recursing would only widen the token's repository
       # list to check out code nothing compiles.
