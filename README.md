@@ -37,8 +37,7 @@ git submodule update --init
 
 Neither needs `--recursive`. `protocol-go/protocol` holds the protocol's XDR
 definitions, but the generated bindings are committed to protocol-go, so
-nothing here compiles it. chuckd's own `scp/` submodule is likewise not a Go
-dependency.
+nothing here compiles it.
 
 ## Building
 
