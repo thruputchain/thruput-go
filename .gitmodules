@@ -1,9 +1,9 @@
 [submodule "chuckd"]
 	path = chuckd
-	url = git@github.com:thruputchain/chuckd.git
+	url = https://github.com/thruputchain/chuckd.git
 [submodule "protocol-go"]
 	path = protocol-go
-	url = git@github.com:thruputchain/thruput-protocol-go.git
+	url = https://github.com/thruputchain/thruput-protocol-go.git
 [submodule "lib-go"]
 	path = lib-go
-	url = git@github.com:thruputchain/lib-go.git
+	url = https://github.com/thruputchain/lib-go.git
