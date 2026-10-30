@@ -22,11 +22,10 @@ jobs:
       # No secrets are involved, which also means pull requests from forks
       # build the same way as branches in this repository.
       #
-      # Deliberately `submodules: true` rather than `recursive`. chuckd
-      # carries its own scp/ submodule and protocol-go carries protocol, but
-      # neither is a Go module dependency -- the workspace builds with both
-      # empty, because protocol-go's generated bindings are committed rather
-      # than regenerated here.
+      # Deliberately `submodules: true` rather than `recursive`. protocol-go
+      # carries protocol, but it is not a Go module dependency -- the
+      # workspace builds with it empty, because protocol-go's generated
+      # bindings are committed rather than regenerated here.
       #
       # persist-credentials: false because nothing here pushes.
       - name: Checkout
