@@ -37,47 +37,20 @@ jobs:
         with:
           ssh-key: ${{ secrets.GROUNDHOG_GO_TO_SELF_WRITE_KEY }}
 
-      # Pinned to a commit SHA rather than the v3 tag: this step receives the
-      # App private key, so a retargeted tag would run different code with
-      # that credential. Same SHA protocol-ts pins.
+      # Only protocol-go is initialized, and it is fetched anonymously: the
+      # submodules are public and pinned by HTTPS URL in .gitmodules, so the
+      # deploy key above is only ever used for the push.
       #
-      # One repository. This job never builds, so it does not need chuckd or
-      # lib-go, and it does not need protocol either: commit.sh's protocol=
-      # field comes from `git submodule status --recursive`, which reads the
-      # nested pin out of protocol-go's own index without checking protocol
-      # out. See the checkout step below.
-      - name: Generate submodule read token
-        id: submodule-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.PROTOCOL_SYNCHRONIZER_APP_ID }}
-          private-key: ${{ secrets.PROTOCOL_SYNCHRONIZER_SECRET_KEY }}
-          owner: thruputchain
-          repositories: thruput-protocol-go
-          permission-contents: read
-
-      # The rewrites are per-repository on purpose. A blanket
-      # git@github.com: -> https:// rule would also capture this repository's
-      # own origin and send the push below over the app token instead of the
-      # deploy key.
-      #
-      # Only protocol-go is initialized. commit.sh builds its message from
-      # `git submodule status --recursive`, and every field that needs
-      # resolves from an index rather than a worktree: chuckd and lib-go from
-      # this repo's index, and protocol-go/protocol from protocol-go's index
-      # once protocol-go itself is present. Checking protocol out would add a
-      # repository to the token for a hash we can already read.
+      # This job never builds, so it does not need chuckd or lib-go, and it
+      # does not need protocol either: commit.sh's protocol= field comes from
+      # `git submodule status --recursive`, which reads the nested pin out of
+      # protocol-go's own index without checking protocol out.
       #
       # What does NOT work is initializing nothing: with protocol-go absent
       # the recursion never reaches protocol, and commit.sh does not fail --
       # it silently emits "protocol= chuckd=..." with an empty field.
       - name: Move protocol-go to its main
-        env:
-          GH_TOKEN: ${{ steps.submodule-token.outputs.token }}
         run: |
-          git config --global \
-            url."https://x-access-token:${GH_TOKEN}@github.com/thruputchain/thruput-protocol-go.git".insteadOf \
-            "git@github.com:thruputchain/thruput-protocol-go.git"
           git submodule update --init protocol-go
           git -C protocol-go fetch origin main
           git -C protocol-go checkout origin/main
@@ -105,7 +78,7 @@ jobs:
           git add protocol-go
           # commit.sh writes the full
           # "protocol=… chuckd=… protocol-go=… lib-go=…" line, the same
-          # message the manual bump-groundhog-go path produces.
+          # message a manual bump produces.
           ./commit.sh
           git push -f -u origin "$BRANCH"
 
