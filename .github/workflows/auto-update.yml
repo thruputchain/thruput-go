@@ -37,23 +37,32 @@ jobs:
         with:
           ssh-key: ${{ secrets.GROUNDHOG_GO_TO_SELF_WRITE_KEY }}
 
-      # Only protocol-go is initialized, and it is fetched anonymously: the
+      # chuckd, lib-go and protocol-go are initialized, fetched anonymously: the
       # submodules are public and pinned by HTTPS URL in .gitmodules, so the
-      # deploy key above is only ever used for the push.
+      # deploy key above is only ever used for the push. chuckd and lib-go are
+      # needed only so `go mod download` below can load the workspace.
       #
-      # This job never builds, so it does not need chuckd or lib-go, and it
-      # does not need protocol either: commit.sh's protocol= field comes from
+      # protocol is not checked out: commit.sh's protocol= field comes from
       # `git submodule status --recursive`, which reads the nested pin out of
-      # protocol-go's own index without checking protocol out.
-      #
-      # What does NOT work is initializing nothing: with protocol-go absent
-      # the recursion never reaches protocol, and commit.sh does not fail --
-      # it silently emits "protocol= chuckd=..." with an empty field.
+      # protocol-go's own index. What does NOT work is leaving protocol-go
+      # uninitialized: the recursion never reaches protocol, and commit.sh does
+      # not fail -- it silently emits "protocol= chuckd=..." with an empty field.
       - name: Move protocol-go to its main
         run: |
-          git submodule update --init protocol-go
+          git submodule update --init
           git -C protocol-go fetch origin main
           git -C protocol-go checkout origin/main
+
+      - name: Install Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.work
+          cache: false
+
+      # A protocol-go bump can change the module graph. Refresh go.work.sum with
+      # it, or ci.yml's go.work.sum check fails the bump and auto-merge stalls.
+      - name: Refresh go.work.sum
+        run: go mod download
 
       - name: Check for changes
         id: diff
@@ -75,7 +84,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git checkout -b "$BRANCH"
-          git add protocol-go
+          git add protocol-go go.work.sum
           # commit.sh writes the full
           # "protocol=… chuckd=… protocol-go=… lib-go=…" line, the same
           # message a manual bump produces.

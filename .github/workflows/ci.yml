@@ -42,6 +42,21 @@ jobs:
             go.work.sum
             chuckd/go.sum
 
+      # go.work.sum is the workspace's lockfile for the checksums no module's
+      # go.sum carries, and Go has no --locked mode: `go mod download` (or a
+      # build that needs a missing sum) silently rewrites a stale one. hogd's
+      # bench hosts prefetched with it, came out "+dirty", and failed hogd's
+      # version handshake. Fail here instead, in the PR that made it stale.
+      - name: Check go.work.sum is current
+        run: |
+          go mod download
+          if [ -n "$(git status --porcelain)" ]; then
+            git status
+            git diff
+            echo "::error file=go.work.sum::go.work.sum is stale: run 'go mod download' at the repository root and commit the result."
+            exit 1
+          fi
+
       # go.work has `use (./chuckd)` with replace directives pointing at the
       # protocol-go and lib-go submodules, so this compiles chuckd against the
       # pinned bindings. That is the whole point of the gate: a protocol-go
